@@ -9,13 +9,14 @@ import { fileURLToPath } from 'node:url';
 import { transformSync } from 'esbuild';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const FILES = ['quality.js', 'math.js', 'shaders.js', 'world.js', 'main.js', 'audio.js']; // concatenation order matters
+const FILES = ['quality.js', 'math.js', 'shaders.js', 'world.js', 'game-core.js', 'main.js', 'audio.js', 'combat-audio.js', 'weapon.js', 'game.js']; // concatenation order matters
 const dev = process.argv.includes('--dev'), readable = dev || process.argv.includes('--readable');
 const out = dev ? 'dev.html' : 'index.html';
 if (dev) FILES.push('dev.js');
 
 let js = FILES.map((f) => readFileSync(path.join(here, 'src', f), 'utf8')).join('\n');
-const tpl = readFileSync(path.join(here, 'template.html'), 'utf8');
+const weaponImage = 'data:image/png;base64,' + readFileSync(path.join(here, 'assets', 'speargun-hands.png')).toString('base64');
+const tpl = readFileSync(path.join(here, 'template.html'), 'utf8').replace('__WEAPON_IMAGE__', () => weaponImage);
 // everything runs inside one async function; startup errors are shown on screen
 const wrap = (body) => `(async()=>{${body}\n})().catch(e=>{console.error(e);document.body.className='l e';document.getElementById('s').textContent=(e.cause?'':'Failed to start: ')+e.message});`;
 
@@ -32,4 +33,4 @@ if (readable) {
 }
 writeFileSync(path.join(here, '..', out), html);
 const gz = gzipSync(Buffer.from(html), { level: 9 }).length;
-console.log(`${out}: ${(html.length / 1024).toFixed(1)} kB${readable ? ' (readable)' : ''}, ${(gz / 1024).toFixed(1)} kB gzipped`);
+console.log(`${out}: ${(Buffer.byteLength(html) / 1024).toFixed(1)} kB${readable ? ' (readable)' : ''}, ${(gz / 1024).toFixed(1)} kB gzipped`);

@@ -1,8 +1,32 @@
 <!doctype html>
-<html lang=en>
+<!--
+Tidehunter is based on Abyssal Garden by Maksymilian Dendura.
+MIT License
+
+Copyright (c) 2026 Maksymilian Dendura
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<html lang=zh-CN>
 <head>
 <meta charset=utf-8>
-<title>Abyssal Garden</title>
+<title>Tidehunter · 潮汐猎手</title>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <meta name=theme-color content=#03131c>
 <style>
@@ -74,9 +98,9 @@ button:active, a:active { transform: translateY(.1em); filter: brightness(.9); }
   box-shadow: inset 0 -.2em #0003, 0 0 2em #19c3d6b3;
 }
 
-/* GitHub and Ko-fi: always at the bottom of the menu, in their own colours */
+/* Project source and online game links at the bottom of the menu. */
 #f { position: absolute; left: 0; right: 0; bottom: 1.5em; display: flex; justify-content: center; gap: 1em; font-size: .8em; }
-a + a { background: #ff5e5b; color: #fff; }
+a + a { background: #147a84; color: #fff; }
 svg { width: 1.5em; height: 1.5em; fill: currentColor; }
 
 /* dark plates under the dive button: detail level, list of controls, touch hint */
@@ -117,40 +141,92 @@ svg { width: 1.5em; height: 1.5em; fill: currentColor; }
   position: absolute; top: 1em; left: 1.2em; margin: 0; font: .8em/1.6 ui-monospace, Consolas, monospace;
   white-space: pre-wrap; text-shadow: 0 1px 4px #000; pointer-events: none;
 }
+/* Photo viewmodel stays sharp even when the underwater scene lowers its resolution. */
+#weapon-layer { position:absolute; inset:0; overflow:hidden; pointer-events:none; container-type:size; }
+body:not(.g) #weapon-layer { display:none; }
+#weapon-rig { position:absolute; height:80cqh; width:120cqh; max-width:none; left:calc(50% - 33.2cqh); bottom:-17.2cqh; object-fit:contain; transform-origin:78% 88%; will-change:transform; user-select:none; -webkit-user-drag:none; }
+/* Hunt HUD is independent from the GPU scene. */
+[hidden] { display:none !important; }
+.tagline { color:#a7e6df; font-size:.8em; letter-spacing:.22em; }
+#m { gap:min(1.4em,4vmin); }
+#hunt { position:absolute; inset:0; pointer-events:none; font:600 13px/1.5 system-ui,sans-serif; }
+#vitals { position:absolute; left:28px; bottom:28px; width:200px; padding:16px 18px; background:#031a2499; border:1px solid #9cf4e433; border-radius:12px; backdrop-filter:blur(8px); }
+#vitals label { display:flex; justify-content:space-between; color:#b5d8df; font-size:11px; letter-spacing:.14em; }
+.meter { height:5px; background:#ffffff18; border-radius:5px; margin:6px 0 12px; overflow:hidden; }
+.meter:last-child { margin-bottom:0; }
+.meter span { display:block; height:100%; transition:width .15s; background:#76e4b8; }
+#oxygen { background:#60cbff; }
+#hunt.danger { box-shadow:inset 0 0 100px #ed384955; }
+#hunt.danger #oxygen { background:#ffb556; }
+#mission { position:absolute; top:25px; left:28px; display:grid; gap:3px; text-shadow:0 2px 10px #000; }
+#mission small { letter-spacing:.2em; color:#9ed1d7; font-size:10px; }
+#score { font:300 32px/1.1 ui-monospace,monospace; letter-spacing:.07em; }
+#goal { color:#c3dce1; font-size:12px; }
+#weapon-panel { position:absolute; right:28px; bottom:32px; text-align:right; text-shadow:0 2px 8px #000; }
+#weapon-panel small { display:block; font-size:10px; letter-spacing:.18em; color:#97b8c5; }
+#reload-track { height:3px; margin-top:6px; width:110px; margin-left:auto; background:#ffffff24; border-radius:2px; overflow:hidden; }
+#reload-fill { display:block; height:100%; background:#84edda; transform-origin:0 50%; }
+#weapon-status { color:#84edda; font-size:14px; }
+#target { position:absolute; top:calc(50% + 27px); left:50%; transform:translateX(-50%); white-space:nowrap; font-size:11px; color:#d3e7e9; text-shadow:0 2px 6px #000; }
+#reticle { position:absolute; left:50%; top:50%; width:18px; height:18px; transform:translate(-50%,-50%); border:1px solid #d9f6f888; border-radius:50%; pointer-events:none; box-shadow:0 0 8px #03222d88; }
+#reticle::after { content:''; position:absolute; left:7px; top:7px; width:4px; height:4px; border-radius:50%; background:#e5ffff; }
+#reticle.locked { border-color:#ffd37b; transform:translate(-50%,-50%) scale(1.25); }
+#reticle.hit { border-color:#fff; box-shadow:0 0 15px #ffe6a9; transform:translate(-50%,-50%) scale(1.65); }
+#reticle.hit::before { content:"×"; position:absolute; inset:-10px; color:#fff1be; font:28px/36px system-ui; text-align:center; }
+#reticle.kill { border-color:#ffce75; box-shadow:0 0 16px #ffbc6280; }
+#toast { position:absolute; left:50%; top:22%; transform:translateX(-50%); width:max-content; max-width:80%; text-align:center; color:#ffe5ae; font-size:14px; text-shadow:0 2px 10px #000; transition:opacity .2s; }
+#shoot { display:none; position:absolute; right:28px; bottom:100px; width:68px; height:68px; padding:0; border:1px solid #8af4db; border-radius:50%; background:#06343cbb; color:#c5fff1; font-size:13px; touch-action:none; }
+#hunt-end { position:absolute; inset:0; z-index:5; display:grid; place-content:center; justify-items:center; gap:20px; background:#02131be8; text-align:center; }
+#hunt-end h2 { margin:0; font-size:2.4em; color:#a8efdf; }
+#end-score { color:#a7c6d1; }
+@media(pointer:coarse) { #shoot { display:flex; } #weapon-panel { bottom:22px; } #vitals { width:145px; padding:10px 12px; left:16px; bottom:16px; } #mission { left:16px; top:16px; } #target { font-size:10px; } }
+@media(max-height:500px) { #m { gap:12px; padding-top:12px; } h1 { font-size:2.5em; } #g { gap:8px; } #f { font-size:.6em; bottom:10px; } #vitals { padding:8px 12px; } }
 </style>
 </head>
 <body class=l>
 <canvas id=c></canvas>
 <div id=m>
-  <h1>Abyssal Garden</h1>
+  <h1>Tidehunter</h1>
+  <p class="tagline">潮汐猎手 · 第一人称深海潜猎</p>
   <div id=a>
     <div id=l><div id=p><i id=b></i></div><p id=s>Diving…</p><p id=w hidden>Use Google Chrome for optimal experience</p></div>
     <div id=g>
-      <button id=d>Dive in</button>
-      <p id=q><span>Detail</span><button>Low</button><button>Medium</button><button>High</button></p>
+      <button id=d>开始潜猎</button>
+      <p id=q><span>画质</span><button>低</button><button>中</button><button>高</button></p>
       <div id=k>
         <p>
-          <i><b>W</b><b>A</b><b>S</b><b>D</b></i>Swim
-          <i><b>Q</b><b>E</b></i>Down / up
-          <i><b>Shift</b></i>Faster
-          <i><b>1</b>–<b>6</b></i>Viewpoints
+          <i><b>W</b><b>A</b><b>S</b><b>D</b></i>游泳
+          <i><b>Q</b><b>E</b></i>下潜 / 上浮
+          <i><b>Shift</b></i>加速
+          <i><b>1</b>–<b>6</b></i>切换海域
         </p>
         <p>
-          <i><b>Esc</b></i>Menu
-          <i><b>M</b></i>Mute
-          <i><b>H</b></i>Stats
+          <i><b>左键</b></i>发射鱼叉
+          <i><b>Esc</b></i>暂停
+          <i><b>M</b></i>静音
+          <i><b>H</b></i>性能
         </p>
       </div>
-      <p id=h>Hold to swim forward · slide to steer · second finger to go faster</p>
+      <p id=h>按住游泳 · 滑动转向 · 双指加速 · 右下角发射</p>
     </div>
   </div>
   <p id=f>
-    <a href=https://github.com/Noniv/abyssal-garden target=_blank><svg viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>GitHub</a>
-    <a href=https://ko-fi.com/noniv target=_blank><svg viewBox="0 0 24 24"><path fill-rule=evenodd d="M2 5h16.5a4.5 4.5 0 0 1 0 9H17a6 6 0 0 1-6 5H8a6 6 0 0 1-6-6zM17 8v3h1.5a1.5 1.5 0 0 0 0-3zM9.5 15.5 5.9 12a2.2 2.2 0 0 1 3.6-2.5 2.2 2.2 0 0 1 3.6 2.5z"/></svg>Support</a>
+    <a href=https://github.com/KamiOrz/tidehunter target=_blank rel=noopener><svg viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>GitHub</a>
+    <a href=https://kamiorz.github.io/tidehunter/ target=_blank rel=noopener><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>在线游玩</a>
   </p>
 </div>
 <button id=o aria-label=Menu>≡</button>
 <pre id=i></pre>
+<div id=weapon-layer hidden aria-hidden=true><img id=weapon-image src="__WEAPON_IMAGE__" alt="" hidden draggable=false><canvas id=weapon-rig></canvas></div>
+<div id=hunt hidden>
+  <div id=mission><small>TIDEHUNTER / 潜猎行动</small><strong id=score>00000</strong><span id=goal>第 1 轮 · 猎获 0 / 8</span></div>
+  <div id=vitals><label>生命 <span id=health-value>100</span></label><div class=meter><span id=health style="width:100%"></span></div><label>氧气 <span id=oxygen-value>100%</span></label><div class=meter><span id=oxygen style="width:100%"></span></div></div>
+  <div id=weapon-panel><small>H-01 / 双带鱼枪</small><span id=weapon-status>鱼箭就绪</span><div id=reload-track><i id=reload-fill></i></div></div>
+  <div id=target></div><div id=toast role=status></div>
+</div>
+<div id=reticle hidden></div>
+<button id=shoot hidden aria-label="发射鱼叉">发射</button>
+<div id=hunt-end hidden><h2>潜水结束</h2><p id=end-reason></p><p id=end-score></p><button id=retry>再次下潜</button><p>按 R 重新开始</p></div>
 <script>
 /*SCRIPT*/
 </script>

@@ -7,6 +7,7 @@ const canvas = $('c'), info = $('i'), body = document.body;
 const rot = matchMedia('(orientation:portrait) and (pointer:coarse)');
 // loading bar: each stage glides it to `to` (the share done) over ~`ms` on the compositor, so it moves while this
 // thread is busy
+let gameView = null;
 let loaded = 0, dead; // dead: the graphics device was lost
 const say = (m, to, ms) => {
   if (!dead) $('s').textContent = m;
@@ -423,6 +424,7 @@ function drawCells(r, start, lo, hi, mar, indexed, verts, minD, maxD) {
   }
 }
 function render() {
+  if (dead) return;
   // camera basis (right vector is horizontal)
   const cx = F[CX], cy = F[CY], cz = F[CZ], pitch = F[PIT], yaw = F[YAW];
   const cp = cos(pitch), fy = sin(pitch), rx = cos(yaw), rz = sin(yaw), fx = cp * rz, fz = -cp * rx;
@@ -471,7 +473,8 @@ function render() {
     if (lod) drawCells(r, Wd.props[i].start, Wd.props[i].lo, Wd.props[i].hi, 3, meshes[18 + i], 0, 6, 110);
   }
   r.setPipeline(pManta); r.setVertexBuffer(1, ibManta); r.drawIndexed(MANTA.ib.length, nManta, MANTA.i0, MANTA.v0, 0);
-  r.setPipeline(pFish); r.setVertexBuffer(1, ibFish); r.drawIndexed(FISH.ib.length, nFish, FISH.i0, FISH.v0, 0);
+  if (!gameView) { r.setPipeline(pFish); r.setVertexBuffer(1, ibFish); r.drawIndexed(FISH.ib.length, nFish, FISH.i0, FISH.v0, 0); }
+  else gameView.drawFish(r);
   // kelp and plants: 9-row blades up close, 5 rows mid-range, a decimated set far away
   r.setPipeline(pLeaf); r.setVertexBuffer(0, ibBig); drawCells(r, Wd.big.start, Wd.big.lo, Wd.big.hi, 5, false, 18, 0, 24);
   r.setPipeline(pLeaf5); drawCells(r, Wd.big.start, Wd.big.lo, Wd.big.hi, 5, false, 10, 24, 58);
@@ -496,7 +499,7 @@ function render() {
   if (slot) { e.resolveQuerySet(qs, 0, 2, qResolve, 0); e.copyBufferToBuffer(qResolve, 0, slot.b, 0, 16); }
   submitList[0] = e.finish();
   Q.submit(submitList);
-  if (slot) { slot.busy = true; slot.b.mapAsync(GPUMapMode.READ).then(slot.done); }
+  if (slot) { slot.busy = true; slot.b.mapAsync(GPUMapMode.READ).then(slot.done).catch(() => { slot.busy = false; }); }
 }
 
 // CS[j] = distance to the rock (metres, < 0 in water) at the camera + CE[3j..3j+2]: the camera, then ±0.375 m on
@@ -529,6 +532,7 @@ function collide() {
 }
 
 function frame(now) {
+  if (dead) return;
   requestAnimationFrame(frame);
   const dtr = now - F[LAST]; F[LAST] = now;
   let dt = dtr / 1000; if (dt > 0.1) dt = 0.1;
@@ -551,7 +555,7 @@ function frame(now) {
     dynN = dynT = dynG = dynGN = 0; resize();
   }
   F[TIME] += dt;
-  {
+  if (!menu && !(gameView && gameView.over())) {
     // touch: holding the finger away from where it went down keeps turning, like a joystick
     if (tId >= 0) {
       const tr = 4 / (innerWidth < innerHeight ? innerWidth : innerHeight); let jx = (tx - tx0) * tr, jy = (ty - ty0) * tr;
@@ -571,6 +575,7 @@ function frame(now) {
     F[YAW] = yaw; F[PIT] = pitch; F[VX] = vx; F[VY] = vy; F[VZ] = vz; F[MX] = x - F[CX]; F[MY] = y - F[CY]; F[MZ] = z - F[CZ];
     collide();
   }
+  if (gameView) gameView.update(dt);
   render();
   if (hud) {
     hN++; if (dtr > hMax) hMax = dtr; if (dtr < hMin) hMin = dtr; if (dtr > hPer * 1.5) { hLate++; hTot++; }
@@ -593,13 +598,13 @@ const key = (e, v) => {
   }
 };
 // behind the menu only the stats and mute keys work
-addEventListener('keydown', (e) => { if (menu && e.code !== 'KeyH' && e.code !== 'KeyM') return; sound(); key(e, 1); });
+addEventListener('keydown', (e) => { if (gameView && gameView.over() && e.code === 'KeyR') { gameView.restart(); go(); return; } if (menu && e.code !== 'KeyH' && e.code !== 'KeyM') return; sound(); key(e, 1); });
 addEventListener('keyup', (e) => key(e, 0));
 const release = () => { kf = kb = kl = kr = ku = kd = ks = 0; tId = -1; tN = 0; };
-const capture = () => { sound(); const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => canvas.requestPointerLock()).catch(() => 0); };
+const capture = () => { if (document.pointerLockElement === canvas) return; sound(); const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => canvas.requestPointerLock()).catch(() => 0); };
 canvas.addEventListener('click', capture);
 addEventListener('mousemove', (e) => { if (document.pointerLockElement === canvas) { mdx += e.movementX; mdy += e.movementY; } });
-addEventListener('blur', release);
+addEventListener('blur', () => { release(); ui(true); });
 const touch = (e) => {
   e.preventDefault(); sound(); tN = e.touches.length;
   let f = null, first = false; for (let i = 0; i < tN; i++) if (e.touches[i].identifier === tId) f = e.touches[i];
@@ -621,10 +626,11 @@ const ui = (m) => {
   if (dead) return;
   menu = m; body.className = m ? 'm' : document.pointerLockElement ? 'g p' : 'g';
   // focus the dive button so Enter works (delayed: it can't take focus while still hidden)
-  if (m) { release(); setTimeout(() => menu && bDive.focus(), 100); } else document.activeElement.blur();
+  if (m) { release(); mdx = mdy = lkx = lky = l2x = l2y = 0; F[VX] = F[VY] = F[VZ] = 0; setTimeout(() => menu && bDive.focus(), 100); } else document.activeElement.blur();
 };
 const go = () => {
-  sound(); ui(false); bDive.textContent = 'Resume';
+  if (gameView && gameView.over()) gameView.restart();
+  sound(); ui(false); bDive.textContent = '继续潜猎';
   // phones: go fullscreen and ask for landscape; where that is refused the CSS rotation still applies
   if (mob) document.documentElement.requestFullscreen?.()?.then(() => screen.orientation.lock('landscape')).catch(() => 0);
   if (!mob) capture();
