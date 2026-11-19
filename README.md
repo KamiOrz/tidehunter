@@ -6,7 +6,7 @@
 
 ## 在线运行与发布
 
-在线版由 GitHub Pages 托管：**https://kamiorz.github.io/tidehunter/**。推荐使用支持 WebGPU 的 Chrome 或 Edge；首次进入会在本机生成海底场景。无需账号或安装，游戏没有后端，声音在开始潜水后启用。
+在线版由 GitHub Pages 托管：[在线游玩 Tidehunter](https://kamiorz.github.io/tidehunter/)。推荐使用支持 WebGPU 的 Chrome 或 Edge；首次进入会在本机生成海底场景。无需账号或安装，游戏没有后端，声音在开始潜水后启用。
 
 发布目录是仓库根目录，入口为 `index.html`。更新源码后运行下方构建命令，将生成的 HTML 一起提交；GitHub Pages 使用 `main` 分支的 `/(root)` 发布。根目录的 `.nojekyll` 保证按静态文件提供，所有游戏资源均已嵌入 HTML，不依赖仓库名或路径重写。
 
