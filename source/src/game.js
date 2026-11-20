@@ -4,9 +4,8 @@
   const weaponView=createWeaponView(),combatAudio=createCombatAudio();
   const seed = crypto.getRandomValues(new Uint32Array(1))[0];
   rseed(seed);
-  const speciesNames = ['金纹鲷', '蓝翼鱼', '珊瑚蝶鱼', '紫鳍鲈', '银梭鱼', '礁鲨', '翡翠鲷', '火尾鱼', '月光蝶鱼', '斑点隆头鱼', '深海梭鱼', '虎纹鲨'];
   const colors = [[1,.7,.13],[.12,.65,1],[1,.35,.15],[.65,.28,1],[.5,.8,.9],[.32,.48,.57],[.12,.9,.55],[1,.2,.32],[.9,.8,.5],[.3,.8,.8],[.5,.5,.95],[.7,.48,.25]];
-  const speciesCount = speciesNames.length, count = LV > 1 ? 96 : LV ? 156 : 240;
+  const speciesCount = 12, count = LV > 1 ? 96 : LV ? 156 : 240;
   // The camera's compact rock field is also the authority for fish and harpoons.
   const rock = (x, y, z) => {
     const gx = (x - OX) / VS - CO, gy = (y - OY) / VS, gz = (z - OZ) / VS - CO;
@@ -85,7 +84,7 @@ struct HO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
   const hudEl=$('hunt'), healthEl=$('health'), oxygenEl=$('oxygen'), scoreEl=$('score'), goalEl=$('goal'), statusEl=$('weapon-status'), targetEl=$('target'), toastEl=$('toast'), reticle=$('reticle'), endEl=$('hunt-end');
   let accumulator=0,uiClock=0,aimClock=0,toastTime=0,holding=false,cinematic=false;
   const player={x:0,y:0,z:0,yaw:0}, counts=new Uint32Array(speciesCount), starts=new Uint32Array(speciesCount), cursor=new Uint32Array(speciesCount);
-  const notice=(message)=>{toastEl.textContent=message;toastTime=3;};
+  const notice=(key,params={})=>{I18N.setText(toastEl,key,params);toastTime=3;};
   const muzzle={x:0,y:0,z:0},arrowPose={x:0,y:0,z:0,dx:0,dy:0,dz:0};
   const particles=Array.from({length:128},()=>({life:0,total:1,x:0,y:0,z:0,vx:0,vy:0,vz:0,size:.02}));let particleIndex=0;
   function burst(e,n){for(let i=0;i<n;i++){
@@ -97,8 +96,9 @@ struct HO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
     lookAt(...POSES[0]);F[VX]=F[VY]=F[VZ]=0;weaponView.reset();combatAudio.reset();
     for(const p of particles)p.life=0;killFlash=0;
     hunt=createHunt({seed,count,speciesCount,rock,spawn:origin,yaw:F[YAW]});
-    accumulator=0;holding=false;endEl.hidden=true;bDive.textContent='继续潜猎';
-    notice('猎获 8 条鱼完成首轮 · 距水面 4 米内补充氧气');
+    accumulator=0;holding=false;endEl.hidden=true;uiClock=0;
+    notice('initialHint');
+    refreshHUD();
   }
   const shoot=()=>{
     if(menu||dead||hunt.over||cinematic)return;
@@ -111,7 +111,20 @@ struct HO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
   $('shoot').addEventListener('pointerdown',(e)=>{e.preventDefault();e.stopPropagation();holding=true;shoot();});
   $('shoot').addEventListener('pointercancel',()=>{holding=false;});
   $('retry').onclick=()=>{restart();go();};
+  // The same refresh runs while paused when a player changes language. Species names and
+  // danger prefixes must be resolved again, rather than cached as already translated text.
+  function refreshHUD(){
+    if(!hunt)return;
+    healthEl.style.width=`${hunt.health}%`;oxygenEl.style.width=`${hunt.oxygen}%`;
+    $('health-value').textContent=Math.ceil(hunt.health);$('oxygen-value').textContent=Math.ceil(hunt.oxygen)+'%';
+    scoreEl.textContent=String(hunt.score).padStart(5,'0');
+    goalEl.textContent=I18N.t('goal',{wave:hunt.wave,kills:hunt.kills,goal:hunt.goal});
+    statusEl.textContent=hunt.cooldown>0?I18N.t('reloading',{seconds:hunt.cooldown.toFixed(1)}):I18N.t('ready');
+    const f=hunt.fish[hunt.target];
+    targetEl.textContent=f&&f.alive?I18N.t('target',{name:I18N.species(f.species),danger:f.predator?I18N.t('danger'):'',hp:f.hp,maxHP:f.maxHP}):I18N.t(mob?'aimHintTouch':'aimHint');
+  }
   restart();
+  I18N.onChange(()=>{uiClock=0;refreshHUD();});
   function packInstance(o,x,y,z,size,yaw,pitch,phase,flash,color,pattern,animate,roll=0,fade=1){
     instanceData[o]=x;instanceData[o+1]=y;instanceData[o+2]=z;instanceData[o+3]=size;instanceData[o+4]=yaw;instanceData[o+5]=pitch;instanceData[o+6]=phase;instanceData[o+7]=flash;
     instanceData[o+8]=color[0];instanceData[o+9]=color[1];instanceData[o+10]=color[2];instanceData[o+11]=pattern;instanceData[o+12]=animate;instanceData[o+13]=roll;instanceData[o+14]=0;instanceData[o+15]=fade;
@@ -142,11 +155,12 @@ struct HO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
         if(e.type==='fire'){weaponView.fire();burst(e,9);}
         if(e.type==='hit'||e.type==='rock'){burst(e,e.type==='hit'?10:5);}
         if(e.type==='kill')killFlash=.55;
-        if(e.type==='kill')notice(`猎获成功 +${e.value}`);
-        if(e.type==='wave')notice(`第 ${e.value} 轮 · 氧气补满 · 生命恢复 +25 · 奖励 +500`);
+        if(e.type==='kill')notice('killNotice',{points:e.value});
+        if(e.type==='wave')notice('waveNotice',{wave:e.value});
         if(e.type==='over'){
-          holding=false;endEl.hidden=false;$('end-score').textContent=`积分 ${hunt.score} · 猎获 ${hunt.kills} 条 · 潜水 ${floor(hunt.elapsed)} 秒`;
-          $('end-reason').textContent=hunt.oxygen<=0?'氧气耗尽，潜水结束':'受到攻击，潜水结束';
+          holding=false;endEl.hidden=false;
+          I18N.setText($('end-score'),'endScore',{score:hunt.score,kills:hunt.kills,seconds:floor(hunt.elapsed)});
+          I18N.setText($('end-reason'),hunt.oxygen<=0?'deathOxygen':'deathAttack');
           if(document.pointerLockElement)document.exitPointerLock();
         }
       }hunt.events.length=0;
@@ -158,13 +172,7 @@ struct HO { @builtin(position) cp: vec4f, @location(0) wp: vec3f, @location(1) n
       toastTime=Math.max(0,toastTime-dt);toastEl.style.opacity=toastTime>0?'1':'0';
       reticle.className=killFlash>0?'hit kill':hunt.hit>0?'hit':hunt.target>=0?'locked':'';
       hudEl.classList.toggle('danger',hunt.hurt>0||hunt.oxygen<20);
-      uiClock-=dt;if(uiClock<=0){
-        healthEl.style.width=`${hunt.health}%`;oxygenEl.style.width=`${hunt.oxygen}%`;
-        $('health-value').textContent=Math.ceil(hunt.health);$('oxygen-value').textContent=Math.ceil(hunt.oxygen)+'%';
-        scoreEl.textContent=String(hunt.score).padStart(5,'0');goalEl.textContent=`第 ${hunt.wave} 轮 · 猎获 ${hunt.kills} / ${hunt.goal}`;
-        statusEl.textContent=hunt.cooldown>0?`上箭 · ${hunt.cooldown.toFixed(1)}s`:'鱼箭就绪';
-        const f=hunt.fish[hunt.target];targetEl.textContent=f&&f.alive?`${speciesNames[f.species]} · ${f.predator?'危险 · ':''}${f.hp}/${f.maxHP}`:'瞄准鱼群 · 左键 / 空格发射';uiClock=.1;
-      }
+      uiClock-=dt;if(uiClock<=0){refreshHUD();uiClock=.1;}
     },
     drawFish(r){
       counts.fill(0);for(const f of hunt.fish)if(f.alive||f.corpse>0)counts[f.species]++;
